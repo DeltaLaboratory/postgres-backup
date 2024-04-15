@@ -23,6 +23,8 @@ jobs:
         with:
           push: true
           platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           tags: |
             ghcr.io/deltalaboratory/postgres-backup:latest
             ghcr.io/deltalaboratory/postgres-backup:${{ github.ref_name }}
@@ -33,6 +35,8 @@ jobs:
         with:
           push: true
           platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           tags: |
             ghcr.io/deltalaboratory/postgres-backup:development
             ghcr.io/deltalaboratory/postgres-backup:${{ github.sha }}
