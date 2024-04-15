@@ -6,11 +6,13 @@ RUN go mod tidy
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /app/app ./cmd
 
 FROM bitnami/minideb:latest
+
 WORKDIR /app
-COPY --from=build /app/app /bin/app
-RUN apt-get update && apt-get install -y wget gnupg2 lsb-release
-RUN sh -c 'echo "deb https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list' && \
+RUN install_packages wget gnupg2 lsb-release ca-certificates && \
+    echo "deb https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list && \
     wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add - && \
-    apt-get update
+    apt remove -y wget gnupg2 lsb-release && apt autoremove -y && apt update
+
+COPY --from=build /app/app /bin/app
 
 CMD ["app", "upload-schedule"]
