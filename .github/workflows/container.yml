@@ -24,9 +24,9 @@ jobs:
           push: true
           platforms: linux/amd64,linux/arm64
           tags: |
-            ghcr.io/deltalaboratory/go-imageserver:latest
-            ghcr.io/deltalaboratory/go-imageserver:${{ github.ref_name }}
-            ghcr.io/deltalaboratory/go-imageserver:${{ github.sha }}
+            ghcr.io/deltalaboratory/postgres-backup:latest
+            ghcr.io/deltalaboratory/postgres-backup:${{ github.ref_name }}
+            ghcr.io/deltalaboratory/postgres-backup:${{ github.sha }}
       - if: "!startsWith(github.ref, 'refs/tags/v')"
         name: build container (development)
         uses: docker/build-push-action@v5
@@ -34,5 +34,5 @@ jobs:
           push: true
           platforms: linux/amd64,linux/arm64
           tags: |
-            ghcr.io/deltalaboratory/go-imageserver:development
-            ghcr.io/deltalaboratory/go-imageserver:${{ github.sha }}
+            ghcr.io/deltalaboratory/postgres-backup:development
+            ghcr.io/deltalaboratory/postgres-backup:${{ github.sha }}
