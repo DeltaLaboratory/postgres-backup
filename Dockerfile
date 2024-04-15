@@ -1,8 +1,11 @@
 FROM cgr.dev/chainguard/go:latest as build
 
 WORKDIR /build
-COPY . .
+
+COPY go.mod go.sum ./
 RUN go mod tidy
+
+COPY . .
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /app/app ./cmd
 
 FROM bitnami/minideb:latest
@@ -13,6 +16,6 @@ RUN install_packages wget gnupg2 lsb-release ca-certificates && \
     wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add - && \
     apt remove -y wget gnupg2 lsb-release && apt autoremove -y && apt update
 
-COPY --from=build /app/app /bin/app
+COPY --from=build /app/app /bin/postgres-backup
 
-CMD ["app", "upload-schedule"]
+CMD ["postgres-backup", "upload-schedule"]
