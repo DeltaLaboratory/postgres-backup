@@ -1,0 +1,31 @@
+name: "Code Analysis"
+on: ["push", "pull_request"]
+
+jobs:
+  basic:
+    name: "Run Basic Code Analysis"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: WillAbides/setup-go-faster@v1.14.0
+        with:
+          go-version: 'stable'
+      - name: Go Mod Cache
+        uses: actions/cache@v4
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
+      - run: "go test ./..."
+      - run: "go vet ./..."
+  golangci-lint:
+    name: "Run GolangCI-Lint Code Analysis"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: WillAbides/setup-go-faster@v1.14.0
+        with:
+          go-version: 'stable'
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v4
+        with:
+          version: latest

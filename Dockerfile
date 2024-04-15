@@ -2,7 +2,7 @@ FROM golang:latest as build
 
 WORKDIR /build
 COPY . .
-RUN go mod download
+RUN go mod tidy
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /app/app ./cmd
 
 FROM bitnami/minideb:latest
@@ -13,4 +13,4 @@ RUN sh -c 'echo "deb https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)
     wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add - && \
     apt-get update
 
-CMD ["app"]
+CMD ["app", "upload-schedule"]

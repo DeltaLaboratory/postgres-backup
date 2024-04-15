@@ -19,9 +19,15 @@ func InstallClient(version int) error {
 		return fmt.Errorf("unsupported version %d", version)
 	}
 
+	// check if the client is already installed
+	cmd := exec.Command("dpkg", "-l", fmt.Sprintf("postgresql-client-%d", version))
+	if err := cmd.Run(); err == nil {
+		return nil
+	}
+
 	logger := log.Logger.With().Str("caller", "install_client").Logger()
 
-	cmd := exec.Command("install_packages", fmt.Sprintf("postgresql-client-%d", version))
+	cmd = exec.Command("install_packages", fmt.Sprintf("postgresql-client-%d", version))
 
 	if config.Loaded.IsVerbose() {
 		stdout, _ := cmd.StdoutPipe()
@@ -30,13 +36,13 @@ func InstallClient(version int) error {
 		go func() {
 			_, err := io.Copy(os.Stdout, stdout)
 			if err != nil {
-				logger.Error().Err(err).Msg("failed to copy stdout")
+				logger.Warn().Err(err).Msg("failed to copy stdout")
 			}
 		}()
 		go func() {
 			_, err := io.Copy(os.Stderr, stderr)
 			if err != nil {
-				logger.Error().Err(err).Msg("failed to copy stderr")
+				logger.Warn().Err(err).Msg("failed to copy stderr")
 			}
 		}()
 	}
@@ -53,6 +59,8 @@ func InstallClient(version int) error {
 
 	return nil
 }
+
+// TODO: dump multiple databases
 
 func Dump() ([]byte, error) {
 	logger := log.Logger.With().Str("caller", "dump_database").Logger()
@@ -85,7 +93,7 @@ func Dump() ([]byte, error) {
 
 	stdout, _ := cmd.StdoutPipe()
 
-	logger.Info().Str("command", cmd.String()).Msg("dumping database")
+	logger.Info().Msg("dumping database")
 
 	err := cmd.Start()
 	if err != nil {
