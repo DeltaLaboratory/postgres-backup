@@ -40,5 +40,8 @@ func main() {
 		}
 		log.Info().Msg("starting cron")
 		c.Run()
+	default:
+		log.Error().Str("command", os.Args[1]).Msg("unknown command")
+		os.Exit(1)
 	}
 }
