@@ -1,4 +1,4 @@
-FROM golang:latest as build
+FROM cgr.dev/chainguard/go:latest as build
 
 WORKDIR /build
 COPY . .
