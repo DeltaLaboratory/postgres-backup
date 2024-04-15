@@ -65,9 +65,9 @@ schedule = [
   "0 1 * * *",
 ]
 
-# compress algorithm, support `zstd`
+# compress algorithm, support `zstd`, optional
 compress_algorithm = "zstd"
-# compress level
+# compress level, optional
 # for zstd, see https://github.com/klauspost/compress/tree/master/zstd#compressor for more information, default 3
 compress_level = 12
 
