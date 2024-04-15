@@ -32,7 +32,7 @@ func Upload(ctx context.Context, data []byte) error {
 
 	logger.Info().Msg("uploading dump to s3")
 
-	objectName := fmt.Sprintf("%s", time.Now().Format("2006-01-02T15:04:05"))
+	objectName := time.Now().Format("2006-01-02T15:04:05")
 
 	if config.Loaded.Upload.S3.Prefix != nil {
 		objectName = fmt.Sprintf("%s/%s", *config.Loaded.Upload.S3.Prefix, objectName)
