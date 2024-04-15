@@ -3,7 +3,6 @@ package main
 import (
 	"os"
 
-	"github.com/robfig/cron/v3"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
@@ -25,21 +24,9 @@ func main() {
 
 	switch os.Args[1] {
 	case "upload":
-		Upload()
+		CommandUpload()
 	case "upload-schedule":
-		if config.Loaded.Schedule == nil || len(config.Loaded.Schedule) == 0 {
-			log.Fatal().Msg("no schedule provided")
-		}
-		c := cron.New()
-		for _, schedule := range config.Loaded.Schedule {
-			_, err := c.AddFunc(schedule, Upload)
-			if err != nil {
-				log.Fatal().Err(err).Str("schedule", schedule).Msg("failed to add schedule")
-			}
-			log.Info().Str("schedule", schedule).Msg("schedule added")
-		}
-		log.Info().Msg("starting cron")
-		c.Run()
+		CommandUploadSchedule()
 	default:
 		log.Error().Str("command", os.Args[1]).Msg("unknown command")
 		os.Exit(1)

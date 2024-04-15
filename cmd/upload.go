@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 
+	"github.com/robfig/cron/v3"
 	"github.com/rs/zerolog/log"
 
 	"postgres-backup/internal/compress"
@@ -11,7 +12,7 @@ import (
 	"postgres-backup/internal/upload/s3"
 )
 
-func Upload() {
+func CommandUpload() {
 	dumped, err := dump.Dump()
 	if err != nil {
 		log.Error().Err(err).Msg("failed to dump database")
@@ -37,4 +38,19 @@ func Upload() {
 			return
 		}
 	}
+}
+
+func CommandUploadSchedule() {
+	if len(config.Loaded.Schedule) == 0 {
+		log.Fatal().Msg("no schedule provided")
+	}
+	c := cron.New()
+	for _, schedule := range config.Loaded.Schedule {
+		if _, err := c.AddFunc(schedule, CommandUpload); err != nil {
+			log.Fatal().Err(err).Str("schedule", schedule).Msg("failed to add schedule")
+		}
+		log.Info().Str("schedule", schedule).Msg("schedule added")
+	}
+	log.Info().Msg("starting cron")
+	c.Run()
 }
