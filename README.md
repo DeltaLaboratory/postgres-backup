@@ -11,7 +11,7 @@ docker run -v ./config.hcl:/etc/postgres_backup/config.hcl ghcr.io/deltalaborato
 ## docker compose
 ```yaml
 backup:
-  image: ghcr.io/deltalaboratory/postgres-backup:v0.0.1
+  image: ghcr.io/deltalaboratory/postgres-backup:latest
   volumes:
     - ./postgres-backup.hcl:/etc/postgres_backup/config.hcl
   restart: unless-stopped
@@ -38,7 +38,7 @@ postgres {
 }
 
 # backup storage configuration
-upload {
+storage {
   # S3 storage configuration
   s3 {
     # S3 endpoint
@@ -59,17 +59,19 @@ upload {
   }
 }
 
-# backup schedule, required when using `upload-schedule` command
+compress {
+  # algorithm, support `zstd`, optional
+  algorithm = "zstd"
+  # compress level, optional
+  # for zstd, see https://github.com/klauspost/compress/tree/master/zstd#compressor for more information, default 3
+  compress_level = 12
+}
+
+# backup schedule, required when using `storage-schedule` command
 # see https://pkg.go.dev/github.com/robfig/cron#hdr-CRON_Expression_Format for more information
 schedule = [
   "0 1 * * *",
 ]
-
-# compress algorithm, support `zstd`, optional
-compress_algorithm = "zstd"
-# compress level, optional
-# for zstd, see https://github.com/klauspost/compress/tree/master/zstd#compressor for more information, default 3
-compress_level = 12
 
 # verbose mode
 verbose = false

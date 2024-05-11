@@ -1,24 +1,21 @@
 package config
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/hashicorp/hcl/v2/hclsimple"
 
-	"postgres-backup/internal/config/upload"
+	"github.com/DeltaLaboratory/postgres-backup/internal/config/storage"
 )
 
 var Loaded *Config
 
 type Config struct {
-	Postgres PostgresConfig `hcl:"postgres,block"`
-	Upload   upload.Upload  `hcl:"upload,block"`
+	Postgres PostgresConfig  `hcl:"postgres,block"`
+	Storage  storage.Storage `hcl:"storage,block"`
+	Compress *CompressConfig `hcl:"compress,block"`
 
 	Schedule []string `hcl:"schedule"`
-
-	CompressAlgorithm *string `hcl:"compress_algorithm"`
-	CompressLevel     *int    `hcl:"compress_level"`
 
 	Verbose *bool `hcl:"verbose"`
 }
@@ -32,27 +29,22 @@ func (c Config) IsVerbose() bool {
 }
 
 func (c Config) Validate() error {
-	if c.CompressAlgorithm != nil {
-		if *c.CompressAlgorithm != "zstd" {
-			return fmt.Errorf("invalid compress algorithm: %s", *c.CompressAlgorithm)
-		}
-
-		if c.CompressLevel == nil {
-			if *c.CompressAlgorithm == "zstd" {
-				c.CompressLevel = new(int)
-				*c.CompressLevel = 3
-			}
-		}
+	if err := c.Compress.Validate(); err != nil {
+		return err
 	}
 	return nil
 }
 
-func LoadConfig() error {
+func LoadConfig(location string) error {
 	var cfg Config
 
 	configLocation := "/etc/postgres_backup/config.hcl"
 	if env, ok := os.LookupEnv("CONFIG_LOCATION"); ok {
 		configLocation = env
+	}
+
+	if location != "" {
+		configLocation = location
 	}
 
 	err := hclsimple.DecodeFile(configLocation, nil, &cfg)
