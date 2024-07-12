@@ -3,7 +3,7 @@ module github.com/DeltaLaboratory/postgres-backup
 go 1.22.2
 
 require (
-	github.com/hashicorp/hcl/v2 v2.20.1
+	github.com/hashicorp/hcl/v2 v2.21.0
 	github.com/klauspost/compress v1.17.9
 	github.com/minio/minio-go/v7 v7.0.73
 	github.com/robfig/cron/v3 v3.0.1
