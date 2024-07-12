@@ -8,7 +8,7 @@ require (
 	github.com/minio/minio-go/v7 v7.0.73
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/rs/zerolog v1.32.0
-	github.com/spf13/cobra v1.8.0
+	github.com/spf13/cobra v1.8.1
 )
 
 require (
