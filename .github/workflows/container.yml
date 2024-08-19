@@ -2,6 +2,10 @@ name: Build Container
 
 on:
   push:
+    branches:
+      - main
+    tags:
+      - v*
 
 jobs:
   build:
@@ -12,14 +16,14 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Login to GitHub Container Registry
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - if: "startsWith(github.ref, 'refs/tags/v')"
         name: build container (release)
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           push: true
           platforms: linux/amd64,linux/arm64
@@ -31,7 +35,7 @@ jobs:
             ghcr.io/deltalaboratory/postgres-backup:${{ github.sha }}
       - if: "!startsWith(github.ref, 'refs/tags/v')"
         name: build container (development)
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           push: true
           platforms: linux/amd64,linux/arm64
