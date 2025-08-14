@@ -23,23 +23,105 @@ import (
 
 // RestoreProcess represents a pg_restore process
 type RestoreProcess struct {
-	cmd   *exec.Cmd
-	stdin io.WriteCloser
+	cmd    *exec.Cmd
+	stdin  io.WriteCloser
+	stdout io.ReadCloser
+	stderr io.ReadCloser
 }
 
 // Start starts the pg_restore process
 func (p *RestoreProcess) Start() error {
-	p.stdin, _ = p.cmd.StdinPipe()
-	if err := p.cmd.Start(); err != nil {
-		return err
+	var err error
+
+	// Set up pipes for stdin, stdout, and stderr
+	p.stdin, err = p.cmd.StdinPipe()
+	if err != nil {
+		return fmt.Errorf("failed to create stdin pipe: %w", err)
 	}
+
+	p.stdout, err = p.cmd.StdoutPipe()
+	if err != nil {
+		return fmt.Errorf("failed to create stdout pipe: %w", err)
+	}
+
+	p.stderr, err = p.cmd.StderrPipe()
+	if err != nil {
+		return fmt.Errorf("failed to create stderr pipe: %w", err)
+	}
+
+	if err := p.cmd.Start(); err != nil {
+		return fmt.Errorf("failed to start pg_restore process: %w", err)
+	}
+
 	return nil
 }
 
 // Wait waits for the pg_restore process to complete
 func (p *RestoreProcess) Wait() error {
+	logger := log.Logger.With().Str("caller", "restore_process_wait").Logger()
+
+	// Close stdin to signal we're done sending data
 	p.stdin.Close()
-	return p.cmd.Wait()
+
+	// Read stdout and stderr concurrently
+	stdoutChan := make(chan string, 1)
+	stderrChan := make(chan string, 1)
+
+	go func() {
+		if p.stdout != nil {
+			if output, err := io.ReadAll(p.stdout); err == nil {
+				stdoutChan <- string(output)
+			} else {
+				stdoutChan <- ""
+			}
+			p.stdout.Close()
+		} else {
+			stdoutChan <- ""
+		}
+	}()
+
+	go func() {
+		if p.stderr != nil {
+			if output, err := io.ReadAll(p.stderr); err == nil {
+				stderrChan <- string(output)
+			} else {
+				stderrChan <- ""
+			}
+			p.stderr.Close()
+		} else {
+			stderrChan <- ""
+		}
+	}()
+
+	// Wait for the process to complete
+	err := p.cmd.Wait()
+
+	// Collect output
+	stdoutOutput := <-stdoutChan
+	stderrOutput := <-stderrChan
+
+	// Log outputs for debugging
+	if stdoutOutput != "" {
+		logger.Debug().Str("pg_restore_stdout", stdoutOutput).Msg("pg_restore stdout output")
+	}
+
+	if stderrOutput != "" {
+		if err != nil {
+			logger.Error().Str("pg_restore_stderr", stderrOutput).Msg("pg_restore error output")
+		} else {
+			logger.Debug().Str("pg_restore_stderr", stderrOutput).Msg("pg_restore stderr output")
+		}
+	}
+
+	// Return enhanced error with pg_restore output
+	if err != nil {
+		if stderrOutput != "" {
+			return fmt.Errorf("pg_restore failed: %w\npg_restore stderr: %s", err, stderrOutput)
+		}
+		return fmt.Errorf("pg_restore failed: %w", err)
+	}
+
+	return nil
 }
 
 // Write writes data to the pg_restore process stdin
@@ -73,8 +155,13 @@ func NewRestore(ctx context.Context, targetDatabase string) (*RestoreProcess, er
 		argument = append(argument, "--username", *config.Loaded.Postgres.User)
 	}
 
-	// Use the target database name
-	argument = append(argument, "--dbname", targetDatabase)
+	// When using --create, connect to a maintenance database (postgres) instead of the target database
+	// This avoids connection issues when the target database doesn't exist yet
+	maintenanceDB := "postgres"
+	if config.Loaded.Postgres.Database != nil && *config.Loaded.Postgres.Database != targetDatabase {
+		maintenanceDB = *config.Loaded.Postgres.Database
+	}
+	argument = append(argument, "--dbname", maintenanceDB)
 
 	process.cmd = exec.CommandContext(ctx, "pg_restore", argument...)
 	if config.Loaded.Postgres.Password != nil {
@@ -87,6 +174,13 @@ func NewRestore(ctx context.Context, targetDatabase string) (*RestoreProcess, er
 // Restore performs a complete restore operation from a backup reader to the target database
 func Restore(backupReader io.Reader, targetDatabase, backupFilename string) error {
 	ctx := context.Background()
+	logger := log.Logger.With().
+		Str("caller", "restore").
+		Str("target_database", targetDatabase).
+		Str("backup_filename", backupFilename).
+		Logger()
+
+	logger.Debug().Msg("starting restore operation")
 
 	// Apply decompression if needed
 	decompressedReader, err := Decompress(backupReader, backupFilename)
@@ -105,20 +199,37 @@ func Restore(backupReader io.Reader, targetDatabase, backupFilename string) erro
 		return fmt.Errorf("failed to start restore process: %w", err)
 	}
 
-	// Stream backup data to pg_restore
-	_, err = io.Copy(restoreProcess, decompressedReader)
+	logger.Debug().Msg("pg_restore process started, beginning data stream")
+
+	// Stream backup data to pg_restore with better error handling
+	bytesStreamed, err := io.Copy(restoreProcess, decompressedReader)
 	if err != nil {
+		logger.Error().
+			Err(err).
+			Int64("bytes_streamed", bytesStreamed).
+			Msg("failed to stream backup data to pg_restore")
+
+		// Try to get pg_restore error output for better diagnostics
 		if waitErr := restoreProcess.Wait(); waitErr != nil {
-			log.Error().Err(waitErr).Msg("failed to wait for restore process cleanup")
+			logger.Error().Err(waitErr).Msg("pg_restore process terminated with error during cleanup")
+			return fmt.Errorf("failed to stream backup data to restore process: %w (pg_restore error: %v)", err, waitErr)
+		} else {
+			logger.Debug().Msg("pg_restore process terminated cleanly after streaming error")
 		}
 		return fmt.Errorf("failed to stream backup data to restore process: %w", err)
 	}
 
+	logger.Debug().
+		Int64("bytes_streamed", bytesStreamed).
+		Msg("backup data streaming completed, waiting for pg_restore to finish")
+
 	// Wait for restore to complete
 	if err := restoreProcess.Wait(); err != nil {
+		logger.Error().Err(err).Msg("pg_restore process failed during completion")
 		return fmt.Errorf("pg_restore process failed: %w", err)
 	}
 
+	logger.Debug().Msg("restore operation completed successfully")
 	return nil
 }
 
