@@ -121,11 +121,53 @@ compress {
   compress_level = 12
 }
 
-# backup schedule, required when using `storage-schedule` command
+# backup schedules, required when using `schedule run` command
 # see https://pkg.go.dev/github.com/robfig/cron#hdr-CRON_Expression_Format for more information
 schedule = [
-  "0 1 * * *",
+  "0 1 * * *",    # Daily at 1 AM
+  "0 13 * * *",   # Daily at 1 PM
 ]
+
+# restore schedules (optional) - automatically restore backups on schedule
+# useful for refreshing test/staging databases
+restore_schedule {
+  # cron expression for when to run the restore
+  cron = "0 3 * * 0"  # Weekly on Sunday at 3 AM
+  
+  # target database name to restore to
+  target_database = "test_db"
+  
+  # backup selection strategy: "latest", "pattern", or "specific"
+  backup_selection = "latest"
+  
+  # include S3 backups in selection (optional, default true)
+  include_s3 = true
+  
+  # include local backups in selection (optional, default true)
+  include_local = true
+  
+  # enable/disable this restore schedule (optional, default true)
+  enabled = true
+}
+
+# example: restore backups matching a pattern
+restore_schedule {
+  cron = "0 4 * * 1"  # Weekly on Monday at 4 AM
+  target_database = "staging_db"
+  backup_selection = "pattern"
+  backup_pattern = "2024-08"  # restore backups containing "2024-08"
+  include_s3 = true
+  include_local = false
+}
+
+# example: restore a specific backup
+restore_schedule {
+  cron = "0 2 15 * *"  # Monthly on 15th at 2 AM
+  target_database = "monthly_test_db"
+  backup_selection = "specific"
+  backup_id = "2024-01-15T01:00:00"  # specific backup timestamp
+  enabled = false  # disabled by default
+}
 
 # verbose mode
 verbose = false

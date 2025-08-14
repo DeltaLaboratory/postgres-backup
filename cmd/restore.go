@@ -91,9 +91,7 @@ Examples:
 
 		// Handle list-only mode
 		if restoreListOnly {
-			if err := listAvailableBackups(cmd.Context(), s3Configured, localConfigured); err != nil {
-				logger.Fatal().Err(err).Msg("failed to list available backups")
-			}
+			listAvailableBackups(cmd.Context(), s3Configured, localConfigured)
 			return
 		}
 
@@ -109,6 +107,7 @@ Examples:
 			}
 			if selectedBackup == nil {
 				logger.Fatal().Msg("no backups found")
+				return // This line will never execute, but helps staticcheck understand
 			}
 			logger.Info().Str("backup", selectedBackup.Name).Str("source", selectedBackup.Source).Msg("selected latest backup")
 		} else if restoreBackupID != "" {
@@ -119,6 +118,7 @@ Examples:
 			}
 			if selectedBackup == nil {
 				logger.Fatal().Str("backup_id", restoreBackupID).Msg("backup not found")
+				return // This line will never execute, but helps staticcheck understand
 			}
 			logger.Info().Str("backup", selectedBackup.Name).Str("source", selectedBackup.Source).Msg("found specified backup")
 		} else {
@@ -226,7 +226,7 @@ func listLocalBackups(logger zerolog.Logger) []BackupEntry {
 	return backups
 }
 
-func listAvailableBackups(ctx context.Context, listS3, listLocal bool) error {
+func listAvailableBackups(ctx context.Context, listS3, listLocal bool) {
 	logger := log.Logger.With().Str("caller", "list_backups").Logger()
 
 	logger.Info().
@@ -257,7 +257,7 @@ func listAvailableBackups(ctx context.Context, listS3, listLocal bool) error {
 
 	if len(allBackups) == 0 {
 		fmt.Fprintln(os.Stdout, "No backups found.")
-		return nil
+		return
 	}
 
 	fmt.Fprintf(os.Stdout, "%-30s %-10s %-15s %s\n", "BACKUP NAME", "SOURCE", "SIZE", "CREATED")
@@ -270,8 +270,6 @@ func listAvailableBackups(ctx context.Context, listS3, listLocal bool) error {
 	}
 
 	fmt.Fprintf(os.Stdout, "\nTotal: %d backups\n", len(allBackups))
-
-	return nil
 }
 
 // formatSize formats a size in bytes to a human-readable string
@@ -365,7 +363,7 @@ func findLatestBackup(ctx context.Context, includeS3, includeLocal bool) (*Backu
 }
 
 // findBackupByID finds a specific backup by ID (timestamp or filename)
-func findBackupByID(ctx context.Context, backupId string, includeS3, includeLocal bool) (*BackupEntry, error) {
+func findBackupByID(ctx context.Context, backupID string, includeS3, includeLocal bool) (*BackupEntry, error) {
 	backups, err := getAllBackups(ctx, includeS3, includeLocal)
 	if err != nil {
 		return nil, err
@@ -373,11 +371,11 @@ func findBackupByID(ctx context.Context, backupId string, includeS3, includeLoca
 
 	for _, backup := range backups {
 		// Check if backup name contains the ID (partial match for timestamp)
-		if strings.Contains(backup.Name, backupId) {
+		if strings.Contains(backup.Name, backupID) {
 			return &backup, nil
 		}
 		// Also check exact name match
-		if backup.Name == backupId {
+		if backup.Name == backupID {
 			return &backup, nil
 		}
 	}

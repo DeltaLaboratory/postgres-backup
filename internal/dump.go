@@ -16,7 +16,6 @@ type Process struct {
 	cmd *exec.Cmd
 
 	stdout io.ReadCloser
-	done   chan struct{}
 }
 
 func (p *Process) Start() error {
