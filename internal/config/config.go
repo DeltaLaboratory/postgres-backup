@@ -38,7 +38,7 @@ type Config struct {
 	Postgres        PostgresConfig          `hcl:"postgres,block"`
 	Storage         storage.Storage         `hcl:"storage,block"`
 	Compress        *CompressConfig         `hcl:"compress,block"`
-	Schedule        []string                `hcl:"schedule"`
+	Schedule        []string                `hcl:"schedule,optional"`
 	RestoreSchedule []RestoreScheduleConfig `hcl:"restore_schedule,block"`
 	Verbose         *bool                   `hcl:"verbose"`
 }
