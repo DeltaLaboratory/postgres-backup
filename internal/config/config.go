@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/hashicorp/hcl/v2/hclsimple"
@@ -32,6 +33,36 @@ func (c Config) Validate() error {
 	if err := c.Compress.Validate(); err != nil {
 		return err
 	}
+
+	// Validate storage retention settings
+	if c.Storage.S3 != nil {
+		// Validate retention_period
+		if c.Storage.S3.RetentionPeriod != nil {
+			if _, err := c.Storage.S3.GetEffectiveRetentionDays(); err != nil {
+				return fmt.Errorf("s3 retention_period validation failed: %w", err)
+			}
+		}
+
+		// Validate retention_count
+		if c.Storage.S3.RetentionCount != nil && *c.Storage.S3.RetentionCount <= 0 {
+			return fmt.Errorf("s3 retention_count must be positive, got %d", *c.Storage.S3.RetentionCount)
+		}
+	}
+
+	if c.Storage.Local != nil {
+		// Validate retention_period
+		if c.Storage.Local.RetentionPeriod != nil {
+			if _, err := c.Storage.Local.GetEffectiveRetentionDays(); err != nil {
+				return fmt.Errorf("local retention_period validation failed: %w", err)
+			}
+		}
+
+		// Validate retention_count
+		if c.Storage.Local.RetentionCount != nil && *c.Storage.Local.RetentionCount <= 0 {
+			return fmt.Errorf("local retention_count must be positive, got %d", *c.Storage.Local.RetentionCount)
+		}
+	}
+
 	return nil
 }
 

@@ -15,19 +15,29 @@ var runCmd = &cobra.Command{
 	Short: "Run the backup schedule",
 	Long:  `Run the backup schedule defined in the configuration file.`,
 	Run: func(cmd *cobra.Command, args []string) {
+		logger := log.Logger.With().Str("caller", "schedule_runner").Logger()
+
 		if len(config.Loaded.Schedule) == 0 {
-			log.Fatal().Msg("no schedule provided")
+			logger.Fatal().Msg("no backup schedules configured - cannot start scheduler")
 		}
+
+		logger.Info().Int("schedule_count", len(config.Loaded.Schedule)).Msg("initializing backup scheduler")
 
 		c := cron.New()
 		for _, schedule := range config.Loaded.Schedule {
 			if id, err := c.AddFunc(schedule, internal.Backup); err != nil {
-				log.Fatal().Err(err).Str("schedule", schedule).Msg("failed to add schedule")
+				logger.Fatal().Err(err).
+					Str("cron_expression", schedule).
+					Msg("failed to register backup schedule - invalid cron expression")
 			} else {
-				log.Info().Str("schedule", schedule).Str("next", c.Entry(id).Next.String()).Msg("schedule added")
+				logger.Info().
+					Str("cron_expression", schedule).
+					Str("next_run", c.Entry(id).Next.String()).
+					Msg("backup schedule registered successfully")
 			}
 		}
-		log.Info().Msg("starting cron")
+
+		logger.Info().Msg("starting backup scheduler - waiting for scheduled backup jobs")
 		c.Run()
 	},
 }

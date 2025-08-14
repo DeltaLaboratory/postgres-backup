@@ -54,8 +54,30 @@ storage {
     # S3 region (optional)
     region = "auto"
 
-    # S3 prefix (optional, backup file will be stored in `{prefix}/2006-01-02T15:04:05.{compress_algorithm}.sql`)
+    # S3 prefix (optional, backup file will be stored in `{prefix}/2006-01-02T15:04:05.{compress_algorithm}`)
     prefix = "backup"
+
+    # Retention settings (optional)
+    # Flexible time-based retention using various formats
+    retention_period = "30 days"    # Examples: "7 days", "1h", "2 weeks", "1 month", "yearly"
+                                    # Also supports: "1hr", "24hrs", "daily", "weekly", "monthly"
+    
+    # Keep only the latest 10 backups (optional, works with time-based retention)
+    retention_count = 10
+  }
+
+  # Local storage configuration (optional, can be used with or without S3)
+  local {
+    # Local directory path to store backups
+    directory = "/var/backups/postgres"
+
+    # Retention settings (optional)
+    # Flexible time-based retention using various formats
+    retention_period = "1 week"     # Examples: "7 days", "24h", "2 weeks", "monthly"
+                                   # Also supports: "1hr", "daily", "weekly", "1 month", "yearly"
+    
+    # Keep only the latest 5 backups (optional, works with time-based retention)
+    retention_count = 5
   }
 }
 
@@ -82,7 +104,7 @@ verbose = false
 - [ ] Add more compress algorithm
 - [ ] Support multiple database backup
 - [ ] Support notification
-- [ ] Support backup retention
+- [X] Support backup retention
 - [ ] Support backup restore
 - [ ] Support streaming compress/upload backup
 - [ ] Support backup encryption

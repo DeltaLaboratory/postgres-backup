@@ -9,12 +9,16 @@ type S3Storage struct {
 	Region *string `hcl:"region"`
 
 	Prefix *string `hcl:"prefix"`
+
+	// Retention settings
+	RetentionPeriod *string `hcl:"retention_period"`
+	RetentionCount  *int    `hcl:"retention_count"`
 }
 
-func (c S3Storage) GetRegion() string {
-	if c.Region == nil {
+func (s S3Storage) GetRegion() string {
+	if s.Region == nil {
 		return ""
 	}
 
-	return *c.Region
+	return *s.Region
 }
