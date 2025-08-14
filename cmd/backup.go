@@ -11,8 +11,8 @@ var backupCmd = &cobra.Command{
 	Use:   "backup",
 	Short: "Backup a PostgreSQL database",
 	Long:  `Backup a PostgreSQL database one and now`,
-	Run: func(cmd *cobra.Command, args []string) {
-		internal.Backup()
+	Run: func(cmd *cobra.Command, _ []string) {
+		internal.Backup(cmd.Context())
 	},
 }
 

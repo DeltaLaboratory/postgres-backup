@@ -1,13 +1,15 @@
 package local
 
+// File updated to remove .sql suffix from backup names
+
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -20,7 +22,7 @@ func Upload(ctx context.Context, reader io.Reader) error {
 	logger := log.Logger.With().Str("caller", "local_upload").Logger()
 
 	if config.Loaded.Storage.Local == nil {
-		return fmt.Errorf("local: config is not present")
+		return errors.New("local: config is not present")
 	}
 
 	// Ensure directory exists
@@ -37,8 +39,6 @@ func Upload(ctx context.Context, reader io.Reader) error {
 	if config.Loaded.Compress != nil {
 		filename = fmt.Sprintf("%s.%s", filename, config.Loaded.Compress.Algorithm)
 	}
-
-	filename = fmt.Sprintf("%s.sql", filename)
 	filepath := filepath.Join(config.Loaded.Storage.Local.Directory, filename)
 
 	file, err := os.Create(filepath)
@@ -73,8 +73,8 @@ type BackupInfo struct {
 	Size         int64
 }
 
-// listBackups lists all backup files in the local directory
-func listBackups() ([]BackupInfo, error) {
+// ListBackups lists all backup files in the local directory
+func ListBackups() ([]BackupInfo, error) {
 	var backups []BackupInfo
 
 	entries, err := os.ReadDir(config.Loaded.Storage.Local.Directory)
@@ -87,8 +87,10 @@ func listBackups() ([]BackupInfo, error) {
 			continue
 		}
 
-		// Only process .sql files (backup files)
-		if strings.HasSuffix(entry.Name(), ".sql") {
+		// Only process files that match backup naming pattern (timestamp-based)
+		// Format: 2006-01-02T15:04:05 with optional compression extension
+		filename := entry.Name()
+		if len(filename) >= 19 && filename[4] == '-' && filename[7] == '-' && filename[10] == 'T' && filename[13] == ':' && filename[16] == ':' {
 			fullPath := filepath.Join(config.Loaded.Storage.Local.Directory, entry.Name())
 			info, err := entry.Info()
 			if err != nil {
@@ -112,7 +114,7 @@ func listBackups() ([]BackupInfo, error) {
 }
 
 // CleanupRetention removes old backups based on retention policy
-func CleanupRetention(ctx context.Context) error {
+func CleanupRetention(_ context.Context) error {
 	logger := log.Logger.With().Str("caller", "local_retention_cleanup").Logger()
 
 	if config.Loaded.Storage.Local == nil {
@@ -146,7 +148,7 @@ func CleanupRetention(ctx context.Context) error {
 	}
 	logEvent.Msg("starting local retention cleanup")
 
-	backups, err := listBackups()
+	backups, err := ListBackups()
 	if err != nil {
 		return fmt.Errorf("failed to list backups: %w", err)
 	}
@@ -208,4 +210,40 @@ func CleanupRetention(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// OpenBackup opens a local backup file and returns an io.ReadCloser
+func OpenBackup(backupPath string) (io.ReadCloser, error) {
+	logger := log.Logger.With().Str("caller", "local_open_backup").Logger()
+
+	if config.Loaded.Storage.Local == nil {
+		return nil, errors.New("local: config is not present")
+	}
+
+	logger.Info().
+		Str("path", backupPath).
+		Msg("opening local backup file")
+
+	// Verify the file exists and get its info
+	fileInfo, err := os.Stat(backupPath)
+	if err != nil {
+		return nil, fmt.Errorf("local: failed to stat backup file: %w", err)
+	}
+
+	if fileInfo.IsDir() {
+		return nil, errors.New("local: backup path is a directory, not a file")
+	}
+
+	// Open the backup file
+	file, err := os.Open(backupPath)
+	if err != nil {
+		return nil, fmt.Errorf("local: failed to open backup file: %w", err)
+	}
+
+	logger.Info().
+		Str("path", backupPath).
+		Str("size", fmt.Sprintf("%d bytes", fileInfo.Size())).
+		Msg("successfully opened local backup file")
+
+	return file, nil
 }

@@ -1,6 +1,8 @@
 package schedule
 
 import (
+	"context"
+
 	"github.com/robfig/cron/v3"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -14,7 +16,7 @@ var runCmd = &cobra.Command{
 	Use:   "run",
 	Short: "Run the backup schedule",
 	Long:  `Run the backup schedule defined in the configuration file.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	Run: func(_ *cobra.Command, _ []string) {
 		logger := log.Logger.With().Str("caller", "schedule_runner").Logger()
 
 		if len(config.Loaded.Schedule) == 0 {
@@ -25,7 +27,7 @@ var runCmd = &cobra.Command{
 
 		c := cron.New()
 		for _, schedule := range config.Loaded.Schedule {
-			if id, err := c.AddFunc(schedule, internal.Backup); err != nil {
+			if id, err := c.AddFunc(schedule, func() { internal.Backup(context.Background()) }); err != nil {
 				logger.Fatal().Err(err).
 					Str("cron_expression", schedule).
 					Msg("failed to register backup schedule - invalid cron expression")

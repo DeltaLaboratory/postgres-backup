@@ -15,7 +15,7 @@ type S3Storage struct {
 	RetentionCount  *int    `hcl:"retention_count"`
 }
 
-func (s S3Storage) GetRegion() string {
+func (s *S3Storage) GetRegion() string {
 	if s.Region == nil {
 		return ""
 	}

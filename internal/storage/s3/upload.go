@@ -2,6 +2,7 @@ package s3
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"sort"
@@ -19,7 +20,7 @@ func Upload(ctx context.Context, reader io.Reader) error {
 	logger := log.Logger.With().Str("caller", "s3_upload").Logger()
 
 	if config.Loaded.Storage.S3 == nil {
-		return fmt.Errorf("s3: config is not present")
+		return errors.New("s3: config is not present")
 	}
 
 	client, err := minio.New(config.Loaded.Storage.S3.Endpoint, &minio.Options{
@@ -51,8 +52,6 @@ func Upload(ctx context.Context, reader io.Reader) error {
 		objectName = fmt.Sprintf("%s.%s", objectName, config.Loaded.Compress.Algorithm)
 	}
 
-	objectName = fmt.Sprintf("%s.sql", objectName)
-
 	info, err := client.PutObject(ctx, config.Loaded.Storage.S3.Bucket, objectName, reader, -1, minio.PutObjectOptions{
 		SendContentMd5: true,
 	})
@@ -81,8 +80,8 @@ type BackupInfo struct {
 	Size         int64
 }
 
-// listBackups lists all backup files in the S3 bucket
-func listBackups(ctx context.Context, client *minio.Client) ([]BackupInfo, error) {
+// ListBackups lists all backup files in the S3 bucket
+func ListBackups(ctx context.Context, client *minio.Client) ([]BackupInfo, error) {
 	var backups []BackupInfo
 	prefix := ""
 
@@ -103,8 +102,20 @@ func listBackups(ctx context.Context, client *minio.Client) ([]BackupInfo, error
 			return nil, fmt.Errorf("failed to list objects: %w", object.Err)
 		}
 
-		// Only process .sql files (backup files)
-		if strings.HasSuffix(object.Key, ".sql") {
+		// Skip directories
+		if strings.HasSuffix(object.Key, "/") {
+			continue
+		}
+
+		// Extract filename from the full key path
+		filename := object.Key
+		if idx := strings.LastIndex(object.Key, "/"); idx >= 0 {
+			filename = object.Key[idx+1:]
+		}
+
+		// Only process files that match backup naming pattern (timestamp-based)
+		// Format: 2006-01-02T15:04:05 with optional compression extension
+		if len(filename) >= 19 && filename[4] == '-' && filename[7] == '-' && filename[10] == 'T' && filename[13] == ':' && filename[16] == ':' {
 			backups = append(backups, BackupInfo{
 				Key:          object.Key,
 				LastModified: object.LastModified,
@@ -165,7 +176,7 @@ func CleanupRetention(ctx context.Context) error {
 		return fmt.Errorf("failed to create S3 client: %w", err)
 	}
 
-	backups, err := listBackups(ctx, client)
+	backups, err := ListBackups(ctx, client)
 	if err != nil {
 		return fmt.Errorf("failed to list backups: %w", err)
 	}
@@ -227,4 +238,66 @@ func CleanupRetention(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// CreateClient creates and configures an S3 client
+func CreateClient() (*minio.Client, error) {
+	if config.Loaded.Storage.S3 == nil {
+		return nil, errors.New("s3: config is not present")
+	}
+
+	client, err := minio.New(config.Loaded.Storage.S3.Endpoint, &minio.Options{
+		Creds:  credentials.NewStaticV4(config.Loaded.Storage.S3.AccessKey, config.Loaded.Storage.S3.SecretKey, ""),
+		Region: config.Loaded.Storage.S3.GetRegion(),
+		Secure: true,
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("s3: failed to create client: %w", err)
+	}
+
+	if config.Loaded.IsVerbose() {
+		client.TraceOn(log.Logger)
+	}
+
+	return client, nil
+}
+
+// DownloadBackup downloads a backup file from S3 and returns an io.ReadCloser
+func DownloadBackup(ctx context.Context, backupKey string) (io.ReadCloser, error) {
+	logger := log.Logger.With().Str("caller", "s3_download").Logger()
+
+	if config.Loaded.Storage.S3 == nil {
+		return nil, errors.New("s3: config is not present")
+	}
+
+	client, err := CreateClient()
+	if err != nil {
+		return nil, err
+	}
+
+	logger.Info().
+		Str("key", backupKey).
+		Str("bucket", config.Loaded.Storage.S3.Bucket).
+		Msg("downloading backup from S3")
+
+	object, err := client.GetObject(ctx, config.Loaded.Storage.S3.Bucket, backupKey, minio.GetObjectOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("s3: failed to get backup object: %w", err)
+	}
+
+	// Get object info to log download details
+	stat, err := object.Stat()
+	if err != nil {
+		object.Close()
+		return nil, fmt.Errorf("s3: failed to stat backup object: %w", err)
+	}
+
+	logger.Info().
+		Str("key", backupKey).
+		Str("bucket", config.Loaded.Storage.S3.Bucket).
+		Str("size", fmt.Sprintf("%d bytes", stat.Size)).
+		Msg("successfully started backup download from S3")
+
+	return object, nil
 }

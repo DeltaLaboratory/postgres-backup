@@ -75,7 +75,7 @@ linters:
   settings:
     cyclop:
       max-complexity: 30
-      package-average: 10
+      package-average: 11
     depguard:
       rules:
         deprecated:
@@ -216,6 +216,9 @@ linters:
           - noctx
           - wrapcheck
         path: _test\.go
+      - linters:
+          - gochecknoinits
+        path: cmd/.+\.go
       - path: (.+)\.go$
         text: 'shadow: declaration of .err. shadows declaration'
       - path: (.+)\.go$

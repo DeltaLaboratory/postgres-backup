@@ -25,7 +25,7 @@ var cleanupCmd = &cobra.Command{
 	Long: `Clean up old backups based on the configured retention policy.
 This command will remove backups that exceed the retention limits defined
 in the configuration file (retention_days and/or retention_count).`,
-	Run: func(cmd *cobra.Command, args []string) {
+	Run: func(_ *cobra.Command, _ []string) {
 		ctx := context.Background()
 		logger := log.Logger.With().Str("caller", "retention_cleanup_cmd").Logger()
 

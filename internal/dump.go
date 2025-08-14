@@ -1,10 +1,13 @@
 package internal
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
+	"strconv"
 
 	"github.com/DeltaLaboratory/postgres-backup/internal/config"
 )
@@ -32,14 +35,14 @@ func (p *Process) Wait() error {
 
 func (p *Process) Read(pb []byte) (int, error) {
 	if p.stdout == nil {
-		return 0, fmt.Errorf("process is not started yet")
+		return 0, errors.New("process is not started yet")
 	}
 	return p.stdout.Read(pb)
 }
 
 // TODO: dump multiple databases
 
-func Dump() (*Process, error) {
+func Dump(ctx context.Context) (*Process, error) {
 	process := new(Process)
 
 	argument := []string{
@@ -48,7 +51,7 @@ func Dump() (*Process, error) {
 	}
 
 	if config.Loaded.Postgres.Port != nil {
-		argument = append(argument, "--port", fmt.Sprintf("%d", *config.Loaded.Postgres.Port))
+		argument = append(argument, "--port", strconv.Itoa(*config.Loaded.Postgres.Port))
 	}
 
 	if config.Loaded.Postgres.User != nil {
@@ -59,7 +62,7 @@ func Dump() (*Process, error) {
 		argument = append(argument, "--dbname", *config.Loaded.Postgres.Database)
 	}
 
-	process.cmd = exec.Command("pg_dump", argument...)
+	process.cmd = exec.CommandContext(ctx, "pg_dump", argument...)
 	if config.Loaded.Postgres.Password != nil {
 		process.cmd.Env = append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", *config.Loaded.Postgres.Password))
 	}

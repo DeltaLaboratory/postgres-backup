@@ -12,7 +12,7 @@ import (
 	"github.com/DeltaLaboratory/postgres-backup/internal/storage/s3"
 )
 
-func Backup() {
+func Backup(ctx context.Context) {
 	logger := log.Logger.With().Str("caller", "backup").Logger()
 
 	// Get database name for logging context
@@ -23,7 +23,7 @@ func Backup() {
 
 	logger.Info().Str("database", dbName).Msg("starting database backup")
 
-	process, err := Dump()
+	process, err := Dump(ctx)
 	if err != nil {
 		logger.Error().Err(err).Str("database", dbName).Msg("failed to create database dump")
 		return

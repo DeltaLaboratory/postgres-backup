@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -11,7 +12,7 @@ import (
 // Supports both predefined periods and flexible formats like "7 days", "1h", "2 weeks", etc.
 func ParseRetentionPeriod(period string) (int, error) {
 	if period == "" {
-		return 0, fmt.Errorf("retention period cannot be empty")
+		return 0, errors.New("retention period cannot be empty")
 	}
 
 	normalized := strings.ToLower(strings.TrimSpace(period))
@@ -36,7 +37,8 @@ func ParseRetentionPeriod(period string) (int, error) {
 	matches := re.FindStringSubmatch(normalized)
 
 	if len(matches) != 3 {
-		return 0, fmt.Errorf("unsupported retention period format '%s'. Supported formats: 'hourly', 'daily', 'weekly', 'monthly', 'yearly', or '<number> <unit>' where unit can be h/hr/hour(s), d/day(s), w/week(s), m/month(s), y/year(s)", period)
+		return 0, fmt.Errorf("unsupported retention period format '%s'. Supported formats: 'hourly', 'daily', 'weekly', 'monthly', 'yearly', "+
+			"or '<number> <unit>' where unit can be h/hr/hour(s), d/day(s), w/week(s), m/month(s), y/year(s)", period)
 	}
 
 	value, err := strconv.Atoi(matches[1])

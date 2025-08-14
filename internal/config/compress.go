@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 
@@ -22,7 +23,7 @@ type CompressConfig struct {
 
 func (c *CompressConfig) Validate() error {
 	if !slices.Contains(compressAlgorithm, c.Algorithm) {
-		return fmt.Errorf("compress.algorithm: unsupported algorithm")
+		return errors.New("compress.algorithm: unsupported algorithm")
 	}
 
 	if c.CompressLevel == nil {

@@ -4,17 +4,49 @@
 
 Postgres-backup backup postgres database to local or remote storage.
 # usage
-## docker
+## backup
+### docker
 ```shell
 docker run -v ./config.hcl:/etc/postgres_backup/config.hcl ghcr.io/deltalaboratory/postgres-backup:latest
 ```
-## docker compose
+### docker compose
 ```yaml
 backup:
   image: ghcr.io/deltalaboratory/postgres-backup:latest
   volumes:
     - ./postgres-backup.hcl:/etc/postgres_backup/config.hcl
   restart: unless-stopped
+```
+
+## restore
+The restore command allows you to restore PostgreSQL databases from backups stored in S3 or local storage.
+
+### examples
+```shell
+# List available backups from all configured storage backends
+postgres-backup restore --list
+
+# Restore the latest backup to the configured database
+postgres-backup restore --latest
+
+# Restore a specific backup by timestamp/filename
+postgres-backup restore --backup 2024-01-15T10:30:00
+
+# Restore to a different database
+postgres-backup restore --latest --to-database mydb_restored
+
+# Restore from specific storage backend only
+postgres-backup restore --list --storage s3
+postgres-backup restore --latest --storage local
+```
+
+### docker restore
+```shell
+# List backups
+docker run -v ./config.hcl:/etc/postgres_backup/config.hcl ghcr.io/deltalaboratory/postgres-backup:latest restore --list
+
+# Restore latest backup
+docker run -v ./config.hcl:/etc/postgres_backup/config.hcl ghcr.io/deltalaboratory/postgres-backup:latest restore --latest
 ```
 # configuration
 this project uses [HCL](https://github.com/hashicorp/hcl) for configuration file.
@@ -105,7 +137,7 @@ verbose = false
 - [ ] Support multiple database backup
 - [ ] Support notification
 - [X] Support backup retention
-- [ ] Support backup restore
+- [X] Support backup restore
 - [ ] Support streaming compress/upload backup
 - [ ] Support backup encryption
 - [ ] Support backup status dashboard?
