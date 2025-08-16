@@ -1,8 +1,6 @@
 package schedule
 
 import (
-	"context"
-
 	"github.com/robfig/cron/v3"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -16,7 +14,7 @@ var runCmd = &cobra.Command{
 	Use:   "run",
 	Short: "Run the backup and restore schedules",
 	Long:  `Run the backup and restore schedules defined in the configuration file.`,
-	Run: func(_ *cobra.Command, _ []string) {
+	Run: func(cmd *cobra.Command, _ []string) {
 		logger := log.Logger.With().Str("caller", "schedule_runner").Logger()
 
 		backupCount := len(config.Loaded.Schedule)
@@ -37,7 +35,7 @@ var runCmd = &cobra.Command{
 
 		// Register backup schedules
 		for _, schedule := range config.Loaded.Schedule {
-			if id, err := c.AddFunc(schedule, func() { internal.Backup(context.Background()) }); err != nil {
+			if _, err := c.AddFunc(schedule, func() { internal.Backup(cmd.Context()) }); err != nil {
 				logger.Fatal().Err(err).
 					Str("cron_expression", schedule).
 					Msg("failed to register backup schedule - invalid cron expression")
@@ -45,7 +43,6 @@ var runCmd = &cobra.Command{
 				logger.Info().
 					Str("type", "backup").
 					Str("cron_expression", schedule).
-					Str("next_run", c.Entry(id).Next.String()).
 					Msg("schedule registered successfully")
 			}
 		}
@@ -63,8 +60,8 @@ var runCmd = &cobra.Command{
 
 			// Create a closure to capture the restore schedule config
 			scheduleConfig := restoreSchedule // Important: capture the value, not the reference
-			if id, err := c.AddFunc(restoreSchedule.Cron, func() {
-				if err := internal.ScheduledRestore(context.Background(), scheduleConfig); err != nil {
+			if _, err := c.AddFunc(restoreSchedule.Cron, func() {
+				if err := internal.ScheduledRestore(cmd.Context(), scheduleConfig); err != nil {
 					log.Error().Err(err).
 						Str("cron_expression", scheduleConfig.Cron).
 						Str("target_database", scheduleConfig.TargetDatabase).
@@ -81,7 +78,6 @@ var runCmd = &cobra.Command{
 					Str("cron_expression", restoreSchedule.Cron).
 					Str("target_database", restoreSchedule.TargetDatabase).
 					Str("backup_selection", restoreSchedule.BackupSelection).
-					Str("next_run", c.Entry(id).Next.String()).
 					Msg("schedule registered successfully")
 			}
 		}
