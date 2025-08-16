@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -63,59 +64,55 @@ func (p *RestoreProcess) Wait() error {
 	// Close stdin to signal we're done sending data
 	p.stdin.Close()
 
-	// Read stdout and stderr concurrently
-	stdoutChan := make(chan string, 1)
-	stderrChan := make(chan string, 1)
+	// Collect all stderr output for error reporting
+	var stderrBuffer strings.Builder
+	stderrDone := make(chan bool)
+	stdoutDone := make(chan bool)
 
+	// Read and log stdout line by line
 	go func() {
+		defer func() { stdoutDone <- true }()
 		if p.stdout != nil {
-			if output, err := io.ReadAll(p.stdout); err == nil {
-				stdoutChan <- string(output)
-			} else {
-				stdoutChan <- ""
+			scanner := bufio.NewScanner(p.stdout)
+			for scanner.Scan() {
+				line := scanner.Text()
+				if line != "" {
+					logger.Debug().Str("pg_restore_stdout", line).Msg("pg_restore stdout")
+				}
 			}
 			p.stdout.Close()
-		} else {
-			stdoutChan <- ""
 		}
 	}()
 
+	// Read and log stderr line by line, also collect for error reporting
 	go func() {
+		defer func() { stderrDone <- true }()
 		if p.stderr != nil {
-			if output, err := io.ReadAll(p.stderr); err == nil {
-				stderrChan <- string(output)
-			} else {
-				stderrChan <- ""
+			scanner := bufio.NewScanner(p.stderr)
+			for scanner.Scan() {
+				line := scanner.Text()
+				if line != "" {
+					stderrBuffer.WriteString(line)
+					stderrBuffer.WriteString("\n")
+					logger.Debug().Str("pg_restore_stderr", line).Msg("pg_restore stderr")
+				}
 			}
 			p.stderr.Close()
-		} else {
-			stderrChan <- ""
 		}
 	}()
 
 	// Wait for the process to complete
 	err := p.cmd.Wait()
 
-	// Collect output
-	stdoutOutput := <-stdoutChan
-	stderrOutput := <-stderrChan
-
-	// Log outputs for debugging
-	if stdoutOutput != "" {
-		logger.Debug().Str("pg_restore_stdout", stdoutOutput).Msg("pg_restore stdout output")
-	}
-
-	if stderrOutput != "" {
-		if err != nil {
-			logger.Error().Str("pg_restore_stderr", stderrOutput).Msg("pg_restore error output")
-		} else {
-			logger.Debug().Str("pg_restore_stderr", stderrOutput).Msg("pg_restore stderr output")
-		}
-	}
+	// Wait for output processing to complete
+	<-stdoutDone
+	<-stderrDone
 
 	// Return enhanced error with pg_restore output
 	if err != nil {
+		stderrOutput := stderrBuffer.String()
 		if stderrOutput != "" {
+			logger.Error().Str("pg_restore_stderr_summary", stderrOutput).Msg("pg_restore process failed")
 			return fmt.Errorf("pg_restore failed: %w\npg_restore stderr: %s", err, stderrOutput)
 		}
 		return fmt.Errorf("pg_restore failed: %w", err)
