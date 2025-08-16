@@ -209,10 +209,9 @@ func Restore(backupReader io.Reader, targetDatabase, backupFilename string) erro
 		// Try to get pg_restore error output for better diagnostics
 		if waitErr := restoreProcess.Wait(); waitErr != nil {
 			logger.Error().Err(waitErr).Msg("pg_restore process terminated with error during cleanup")
-			return fmt.Errorf("failed to stream backup data to restore process: %w (pg_restore error: %v)", err, waitErr)
-		} else {
-			logger.Debug().Msg("pg_restore process terminated cleanly after streaming error")
+			return fmt.Errorf("failed to stream backup data to restore process: %w (pg_restore error: %w)", err, waitErr)
 		}
+		logger.Debug().Msg("pg_restore process terminated cleanly after streaming error")
 		return fmt.Errorf("failed to stream backup data to restore process: %w", err)
 	}
 
