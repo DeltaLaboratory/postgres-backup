@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"context"
-
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
@@ -25,8 +23,7 @@ var cleanupCmd = &cobra.Command{
 	Long: `Clean up old backups based on the configured retention policy.
 This command will remove backups that exceed the retention limits defined
 in the configuration file (retention_days and/or retention_count).`,
-	Run: func(_ *cobra.Command, _ []string) {
-		ctx := context.Background()
+	Run: func(cmd *cobra.Command, _ []string) {
 		logger := log.Logger.With().Str("caller", "retention_cleanup_cmd").Logger()
 
 		// Count configured storage backends
@@ -50,7 +47,7 @@ in the configuration file (retention_days and/or retention_count).`,
 
 		// Run S3 retention cleanup if configured
 		if config.Loaded.Storage.S3 != nil {
-			if err := s3.CleanupRetention(ctx); err != nil {
+			if err := s3.CleanupRetention(cmd.Context()); err != nil {
 				logger.Error().Err(err).
 					Str("bucket", config.Loaded.Storage.S3.Bucket).
 					Msg("S3 retention cleanup failed")
@@ -64,7 +61,7 @@ in the configuration file (retention_days and/or retention_count).`,
 
 		// Run local retention cleanup if configured
 		if config.Loaded.Storage.Local != nil {
-			if err := local.CleanupRetention(ctx); err != nil {
+			if err := local.CleanupRetention(cmd.Context()); err != nil {
 				logger.Error().Err(err).
 					Str("directory", config.Loaded.Storage.Local.Directory).
 					Msg("local retention cleanup failed")
