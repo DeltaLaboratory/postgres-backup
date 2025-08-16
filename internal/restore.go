@@ -139,9 +139,9 @@ func NewRestore(ctx context.Context, targetDatabase string) (*RestoreProcess, er
 	argument := []string{
 		"--format", "custom",
 		"--host", config.Loaded.Postgres.Host,
-		"--clean",         // Clean (drop) database objects before recreating them
-		"--create",        // Create the database before restoring into it
-		"--exit-on-error", // Exit on error, don't try to continue
+		"--clean",  // Clean (drop) database objects before recreating them
+		"--create", // Create the database before restoring into it
+		// "--exit-on-error", // Exit on error, don't try to continue
 		"--no-owner",      // Skip restoration of object ownership
 		"--no-privileges", // Skip restoration of access privileges (grant/revoke commands)
 		"--verbose",       // Verbose mode for detailed output
