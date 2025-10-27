@@ -4,7 +4,7 @@ go 1.23.0
 
 require (
 	github.com/hashicorp/hcl/v2 v2.24.0
-	github.com/klauspost/compress v1.18.0
+	github.com/klauspost/compress v1.18.1
 	github.com/minio/minio-go/v7 v7.0.95
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/rs/zerolog v1.34.0
