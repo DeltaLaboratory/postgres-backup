@@ -42,11 +42,12 @@ func Backup(ctx context.Context) {
 	go func() {
 		_, copyErr := io.Copy(pw, process)
 		waitErr := process.Wait()
-		if waitErr != nil {
+		switch {
+		case waitErr != nil:
 			pw.CloseWithError(waitErr)
-		} else if copyErr != nil {
+		case copyErr != nil:
 			pw.CloseWithError(copyErr)
-		} else {
+		default:
 			pw.Close()
 		}
 	}()

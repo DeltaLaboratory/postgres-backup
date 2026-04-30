@@ -29,11 +29,12 @@ func Compress(input io.Reader) (io.ReadCloser, error) {
 		go func() {
 			_, copyErr := encoder.ReadFrom(input)
 			closeErr := encoder.Close()
-			if copyErr != nil {
+			switch {
+			case copyErr != nil:
 				w.CloseWithError(copyErr)
-			} else if closeErr != nil {
+			case closeErr != nil:
 				w.CloseWithError(closeErr)
-			} else {
+			default:
 				w.Close()
 			}
 		}()
@@ -48,11 +49,12 @@ func Compress(input io.Reader) (io.ReadCloser, error) {
 		go func() {
 			_, copyErr := io.Copy(writer, input)
 			closeErr := writer.Close()
-			if copyErr != nil {
+			switch {
+			case copyErr != nil:
 				w.CloseWithError(copyErr)
-			} else if closeErr != nil {
+			case closeErr != nil:
 				w.CloseWithError(closeErr)
-			} else {
+			default:
 				w.Close()
 			}
 		}()
