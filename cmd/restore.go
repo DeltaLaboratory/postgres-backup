@@ -23,6 +23,7 @@ var (
 	restoreBackupID   string
 	restoreToDatabase string
 	restoreListOnly   bool
+	restoreLatest     bool
 	restoreStorage    string
 )
 
@@ -99,7 +100,7 @@ Examples:
 		var selectedBackup *BackupEntry
 		var err error
 
-		if restoreBackupID == "latest" || (restoreBackupID == "" && len(args) == 0) {
+		if restoreLatest || restoreBackupID == "latest" || (restoreBackupID == "" && len(args) == 0) {
 			// Find latest backup
 			selectedBackup, err = findLatestBackup(cmd.Context(), s3Configured, localConfigured)
 			if err != nil {
@@ -147,12 +148,14 @@ Examples:
 func init() {
 	restoreCmd.Flags().StringVar(&restoreBackupID, "backup", "", "specific backup to restore (timestamp or filename)")
 	restoreCmd.Flags().BoolVar(&restoreListOnly, "list", false, "list available backups without restoring")
-	restoreCmd.Flags().BoolVar(&restoreListOnly, "latest", false, "restore the most recent backup")
+	restoreCmd.Flags().BoolVar(&restoreLatest, "latest", false, "restore the most recent backup")
 	restoreCmd.Flags().StringVar(&restoreToDatabase, "to-database", "", "target database name (defaults to configured database)")
 	restoreCmd.Flags().StringVar(&restoreStorage, "storage", "", "storage backend to use: 's3' or 'local' (defaults to all configured)")
 
-	// Mark backup and latest as mutually exclusive
+	// Mark mutually exclusive flags
 	restoreCmd.MarkFlagsMutuallyExclusive("backup", "latest")
+	restoreCmd.MarkFlagsMutuallyExclusive("list", "latest")
+	restoreCmd.MarkFlagsMutuallyExclusive("list", "backup")
 
 	RootCmd.AddCommand(restoreCmd)
 }
@@ -417,7 +420,7 @@ func performRestore(ctx context.Context, backup *BackupEntry, targetDatabase str
 	logger.Info().Msg("backup data retrieved, starting restore process")
 
 	// Perform the restore
-	err = internal.Restore(backupReader, targetDatabase, backup.Name)
+	err = internal.Restore(ctx, backupReader, targetDatabase, backup.Name)
 	if err != nil {
 		return fmt.Errorf("restore process failed: %w", err)
 	}
