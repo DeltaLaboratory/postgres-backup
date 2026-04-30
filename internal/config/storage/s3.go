@@ -9,6 +9,7 @@ type S3Storage struct {
 	Region *string `hcl:"region"`
 
 	Prefix *string `hcl:"prefix"`
+	Secure *bool   `hcl:"secure"`
 
 	// Retention settings
 	RetentionPeriod *string `hcl:"retention_period"`
@@ -21,4 +22,12 @@ func (s *S3Storage) GetRegion() string {
 	}
 
 	return *s.Region
+}
+
+func (s *S3Storage) IsSecure() bool {
+	if s.Secure == nil {
+		return true
+	}
+
+	return *s.Secure
 }

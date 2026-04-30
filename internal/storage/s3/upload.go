@@ -26,7 +26,7 @@ func Upload(ctx context.Context, reader io.Reader) error {
 	client, err := minio.New(config.Loaded.Storage.S3.Endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(config.Loaded.Storage.S3.AccessKey, config.Loaded.Storage.S3.SecretKey, ""),
 		Region: config.Loaded.Storage.S3.GetRegion(),
-		Secure: true,
+		Secure: config.Loaded.Storage.S3.IsSecure(),
 	})
 
 	if err != nil {
@@ -170,7 +170,7 @@ func CleanupRetention(ctx context.Context) error {
 	client, err := minio.New(config.Loaded.Storage.S3.Endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(config.Loaded.Storage.S3.AccessKey, config.Loaded.Storage.S3.SecretKey, ""),
 		Region: config.Loaded.Storage.S3.GetRegion(),
-		Secure: true,
+		Secure: config.Loaded.Storage.S3.IsSecure(),
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create S3 client: %w", err)
@@ -249,7 +249,7 @@ func CreateClient() (*minio.Client, error) {
 	client, err := minio.New(config.Loaded.Storage.S3.Endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(config.Loaded.Storage.S3.AccessKey, config.Loaded.Storage.S3.SecretKey, ""),
 		Region: config.Loaded.Storage.S3.GetRegion(),
-		Secure: true,
+		Secure: config.Loaded.Storage.S3.IsSecure(),
 	})
 
 	if err != nil {
