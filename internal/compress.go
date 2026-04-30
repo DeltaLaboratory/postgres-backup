@@ -7,7 +7,6 @@ import (
 
 	"github.com/klauspost/compress/gzip"
 	"github.com/klauspost/compress/zstd"
-	"github.com/rs/zerolog/log"
 
 	"github.com/DeltaLaboratory/postgres-backup/internal/config"
 )
@@ -17,7 +16,7 @@ const (
 	algorithmGzip = "gzip"
 )
 
-func Compress(input io.Reader) (io.Reader, error) {
+func Compress(input io.Reader) (io.ReadCloser, error) {
 	r, w := io.Pipe()
 
 	switch config.Loaded.Compress.Algorithm {
@@ -28,23 +27,34 @@ func Compress(input io.Reader) (io.Reader, error) {
 		}
 
 		go func() {
-			if _, err := encoder.ReadFrom(input); err != nil {
-				log.Error().Err(err).Msg("failed to read from input during zstd compression")
+			_, copyErr := encoder.ReadFrom(input)
+			closeErr := encoder.Close()
+			if copyErr != nil {
+				w.CloseWithError(copyErr)
+			} else if closeErr != nil {
+				w.CloseWithError(closeErr)
+			} else {
+				w.Close()
 			}
-			encoder.Close()
-			w.Close()
 		}()
 
 		return r, nil
 	case algorithmGzip:
-		writer, _ := gzip.NewWriterLevel(w, *config.Loaded.Compress.CompressLevel)
+		writer, err := gzip.NewWriterLevel(w, *config.Loaded.Compress.CompressLevel)
+		if err != nil {
+			return nil, err
+		}
 
 		go func() {
-			if _, err := io.Copy(writer, input); err != nil {
-				log.Error().Err(err).Msg("failed to copy input during gzip compression")
+			_, copyErr := io.Copy(writer, input)
+			closeErr := writer.Close()
+			if copyErr != nil {
+				w.CloseWithError(copyErr)
+			} else if closeErr != nil {
+				w.CloseWithError(closeErr)
+			} else {
+				w.Close()
 			}
-			writer.Close()
-			w.Close()
 		}()
 
 		return r, nil
@@ -54,7 +64,7 @@ func Compress(input io.Reader) (io.Reader, error) {
 }
 
 // Decompress decompresses the input stream based on the detected compression algorithm
-func Decompress(input io.Reader, filename string) (io.Reader, error) {
+func Decompress(input io.Reader, filename string) (io.ReadCloser, error) {
 	// Detect compression algorithm from filename
 	var algorithm string
 	switch {
@@ -64,7 +74,7 @@ func Decompress(input io.Reader, filename string) (io.Reader, error) {
 		algorithm = algorithmGzip
 	default:
 		// No compression detected, return input as-is
-		return input, nil
+		return io.NopCloser(input), nil
 	}
 
 	switch algorithm {
@@ -73,7 +83,7 @@ func Decompress(input io.Reader, filename string) (io.Reader, error) {
 		if err != nil {
 			return nil, err
 		}
-		return decoder, nil
+		return decoder.IOReadCloser(), nil
 	case algorithmGzip:
 		reader, err := gzip.NewReader(input)
 		if err != nil {
@@ -81,6 +91,6 @@ func Decompress(input io.Reader, filename string) (io.Reader, error) {
 		}
 		return reader, nil
 	default:
-		return input, nil
+		return io.NopCloser(input), nil
 	}
 }

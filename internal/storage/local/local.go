@@ -1,7 +1,5 @@
 package local
 
-// File updated to remove .sql suffix from backup names
-
 import (
 	"context"
 	"errors"
@@ -45,11 +43,16 @@ func Upload(ctx context.Context, reader io.Reader) error {
 	if err != nil {
 		return fmt.Errorf("local: failed to create file: %w", err)
 	}
-	defer file.Close()
 
 	bytesWritten, err := io.Copy(file, reader)
+	closeErr := file.Close()
 	if err != nil {
+		os.Remove(filepath)
 		return fmt.Errorf("local: failed to write backup: %w", err)
+	}
+	if closeErr != nil {
+		os.Remove(filepath)
+		return fmt.Errorf("local: failed to close backup file: %w", closeErr)
 	}
 
 	logger.Info().

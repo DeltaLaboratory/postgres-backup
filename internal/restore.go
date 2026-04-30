@@ -13,8 +13,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/minio/minio-go/v7"
-	"github.com/minio/minio-go/v7/pkg/credentials"
 	"github.com/rs/zerolog/log"
 
 	"github.com/DeltaLaboratory/postgres-backup/internal/config"
@@ -169,8 +167,7 @@ func NewRestore(ctx context.Context, targetDatabase string) (*RestoreProcess, er
 }
 
 // Restore performs a complete restore operation from a backup reader to the target database
-func Restore(backupReader io.Reader, targetDatabase, backupFilename string) error {
-	ctx := context.Background()
+func Restore(ctx context.Context, backupReader io.Reader, targetDatabase, backupFilename string) error {
 	logger := log.Logger.With().
 		Str("caller", "restore").
 		Str("target_database", targetDatabase).
@@ -184,6 +181,7 @@ func Restore(backupReader io.Reader, targetDatabase, backupFilename string) erro
 	if err != nil {
 		return fmt.Errorf("failed to decompress backup: %w", err)
 	}
+	defer decompressedReader.Close()
 
 	// Create pg_restore process
 	restoreProcess, err := NewRestore(ctx, targetDatabase)
@@ -297,12 +295,7 @@ func getAllBackupsForSchedule(ctx context.Context, includeS3, includeLocal bool)
 
 	// Get S3 backups if enabled
 	if includeS3 && config.Loaded.Storage.S3 != nil {
-		// Create S3 client
-		client, err := minio.New(config.Loaded.Storage.S3.Endpoint, &minio.Options{
-			Creds:  credentials.NewStaticV4(config.Loaded.Storage.S3.AccessKey, config.Loaded.Storage.S3.SecretKey, ""),
-			Region: config.Loaded.Storage.S3.GetRegion(),
-			Secure: true,
-		})
+		client, err := s3.CreateClient()
 		if err != nil {
 			return nil, fmt.Errorf("failed to create S3 client: %w", err)
 		}
@@ -443,7 +436,7 @@ func performScheduledRestore(ctx context.Context, backup *BackupEntry, targetDat
 	logger.Info().Msg("backup data retrieved, starting restore process")
 
 	// Perform the restore
-	err = Restore(backupReader, targetDatabase, backup.Name)
+	err = Restore(ctx, backupReader, targetDatabase, backup.Name)
 	if err != nil {
 		return fmt.Errorf("restore process failed: %w", err)
 	}

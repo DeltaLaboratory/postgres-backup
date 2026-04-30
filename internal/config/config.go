@@ -52,8 +52,10 @@ func (c Config) IsVerbose() bool {
 }
 
 func (c Config) Validate() error {
-	if err := c.Compress.Validate(); err != nil {
-		return err
+	if c.Compress != nil {
+		if err := c.Compress.Validate(); err != nil {
+			return err
+		}
 	}
 
 	// Validate storage retention settings

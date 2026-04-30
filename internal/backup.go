@@ -34,15 +34,34 @@ func Backup(ctx context.Context) {
 		return
 	}
 
-	var reader io.Reader = process
+	// Wrap pg_dump output in a pipe that propagates process exit status.
+	// If pg_dump fails mid-stream, the pipe reader returns the error,
+	// causing downstream compress/upload to abort before completing.
+	pr, pw := io.Pipe()
+	defer pr.Close()
+	go func() {
+		_, copyErr := io.Copy(pw, process)
+		waitErr := process.Wait()
+		if waitErr != nil {
+			pw.CloseWithError(waitErr)
+		} else if copyErr != nil {
+			pw.CloseWithError(copyErr)
+		} else {
+			pw.Close()
+		}
+	}()
+
+	var reader io.Reader = pr
 
 	if config.Loaded.Compress != nil {
 		logger.Info().Str("algorithm", config.Loaded.Compress.Algorithm).Int("compress_level", *config.Loaded.Compress.CompressLevel).Str("database", dbName).Msg("starting compression stream")
-		reader, err = Compress(reader)
-		if err != nil {
-			logger.Error().Err(err).Str("database", dbName).Str("algorithm", config.Loaded.Compress.Algorithm).Msg("failed to compress database dump")
+		compressReader, compressErr := Compress(reader)
+		if compressErr != nil {
+			logger.Error().Err(compressErr).Str("database", dbName).Str("algorithm", config.Loaded.Compress.Algorithm).Msg("failed to compress database dump")
 			return
 		}
+		defer compressReader.Close()
+		reader = compressReader
 	}
 
 	// Buffer the data if we need to upload to multiple storage backends
@@ -50,15 +69,16 @@ func Backup(ctx context.Context) {
 	bothConfigured := config.Loaded.Storage.S3 != nil && config.Loaded.Storage.Local != nil
 
 	if bothConfigured {
-		// Read all data into buffer for multiple uploads
 		logger.Info().Str("database", dbName).Msg("buffering backup data for multiple storage backends")
 		buffer = &bytes.Buffer{}
 		_, err = io.Copy(buffer, reader)
 		if err != nil {
-			logger.Error().Err(err).Str("database", dbName).Msg("failed to buffer backup data for storage")
+			logger.Error().Err(err).Str("database", dbName).Msg("failed to read backup data")
 			return
 		}
 	}
+
+	var hadError bool
 
 	// Upload to S3 if configured
 	if config.Loaded.Storage.S3 != nil {
@@ -69,7 +89,8 @@ func Backup(ctx context.Context) {
 			s3Reader = reader
 		}
 
-		if err := s3.Upload(context.Background(), s3Reader); err != nil {
+		if err := s3.Upload(ctx, s3Reader); err != nil {
+			hadError = true
 			logger.Error().Err(err).Str("database", dbName).Str("bucket", config.Loaded.Storage.S3.Bucket).Msg("failed to upload backup to S3")
 		} else {
 			logger.Info().Str("database", dbName).Str("bucket", config.Loaded.Storage.S3.Bucket).Msg("successfully uploaded backup to S3")
@@ -85,16 +106,17 @@ func Backup(ctx context.Context) {
 			localReader = reader
 		}
 
-		if err := local.Upload(context.Background(), localReader); err != nil {
+		if err := local.Upload(ctx, localReader); err != nil {
+			hadError = true
 			logger.Error().Err(err).Str("database", dbName).Str("directory", config.Loaded.Storage.Local.Directory).Msg("failed to upload backup to local storage")
 		} else {
 			logger.Info().Str("database", dbName).Str("directory", config.Loaded.Storage.Local.Directory).Msg("successfully uploaded backup to local storage")
 		}
 	}
 
-	if err := process.Wait(); err != nil {
-		logger.Error().Err(err).Str("database", dbName).Msg("pg_dump process finished with error")
+	if hadError {
+		logger.Error().Str("database", dbName).Msg("database backup completed with errors")
+	} else {
+		logger.Info().Str("database", dbName).Msg("database backup completed successfully")
 	}
-
-	logger.Info().Str("database", dbName).Msg("database backup completed successfully")
 }
